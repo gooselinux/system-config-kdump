@@ -1,0 +1,47 @@
+From cad60ee05900d24cb2a3d46be7cd9cf76c539ee8 Mon Sep 17 00:00:00 2001
+From: Roman Rakus <rrakus@redhat.com>
+Date: Tue, 10 Aug 2010 19:03:35 +0200
+Subject: [PATCH] Add fallback from getting mem from /proc/iomem to /proc/meminfo
+
+There is some bug that there is empty /proc/iomem on some machines -
+especially ppc64. Adding fallback to previous method of getting
+total system memory. If we don't get total mem from /proc/iomem,
+inform the user about that and read total mem from /proc/iomem.
+
+Signed-off-by: Roman Rakus <rrakus@redhat.com>
+---
+ src/system-config-kdump.py |   11 +++++++++--
+ 1 files changed, 9 insertions(+), 2 deletions(-)
+
+diff --git a/src/system-config-kdump.py b/src/system-config-kdump.py
+index 0b6078e..7c467c1 100755
+--- a/src/system-config-kdump.py
++++ b/src/system-config-kdump.py
+@@ -644,8 +644,13 @@ class MainWindow:
+                 total_mem += self.hex2mb_float(hex_ck_end) - self.hex2mb_float(hex_ck_start)
+         total_mem = int(total_mem + 0.999999)
+         if total_mem == 0:
+-            self.show_error_message(_("Failed to detect total system memory"), _("system-config-kdump: Memory error"))
+-            sys.exit(1)
++            self.show_error_message(
++                _("Failed to detect total system memory from /proc/iomem. "
++                  "Total system memory will not be accurate."),
++                _("system-config-kdump: Memory error"))
++            for line in open("/proc/meminfo").readlines():
++                if line.startswith("MemTotal:"):
++                    total_mem = int(line.split()[1]) / 1024
+ 
+ 
+         # Check for a xen kernel, we do things a bit different w/xen
+@@ -702,6 +707,8 @@ class MainWindow:
+         step = 64
+         auto_thresh = 4096
+ 
++        total_mem += kdump_mem
++
+         if resource.getpagesize() > 4096:
+             auto_thresh = auto_thresh * 2
+ 
+-- 
+1.7.1.1
+
